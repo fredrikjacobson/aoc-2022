@@ -25,14 +25,14 @@
       "",
       "#[test]",
       "pub fn test_day${TM_FILENAME/day(.*)\\..+$/$1/}_pt_1() {",
-      "  let lines: Vec<String> = read_lines(${TM_FILENAME/day(.*)\\..+$/$1/}, false);",
+      "  let lines: Vec<String> = read_lines(${TM_FILENAME/day(.*)\\..+$/$1/}, true);",
       "  println!(\"Part1 score is {:?}\", 0);",
       "  assert!(false);",
       "}",
       "#[test]",
       "pub fn test_day${TM_FILENAME/day(.*)\\..+$/$1/}_pt_2() {",
       "  let lines: Vec<String> = read_lines(${TM_FILENAME/day(.*)\\..+$/$1/}, false);",
-      "  println!(\"Part1 score is {:?}\", 0);",
+      "  println!(\"Part2 score is {:?}\", 0);",
       "  assert!(false);",
       "}"
     ]
