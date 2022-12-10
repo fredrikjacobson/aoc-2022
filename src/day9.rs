@@ -82,14 +82,14 @@ fn move_tail(tail: &(i16, i16), head: (i16, i16)) -> (i16, i16) {
     let (tail_x, tail_y) = tail.clone();
     let (head_x, head_y) = head;
 
-    if (tail_x == head_x && tail_y.abs_diff(head_y) > 1) {
-        if (tail_y > head_y) {
+    if tail_x == head_x && tail_y.abs_diff(head_y) > 1 {
+        if tail_y > head_y {
             (tail_x, tail_y - 1)
         } else {
             (tail_x, tail_y + 1)
         }
-    } else if (tail_y == head_y && tail_x.abs_diff(head_x) > 1) {
-        if (tail_x > head_x) {
+    } else if tail_y == head_y && tail_x.abs_diff(head_x) > 1 {
+        if tail_x > head_x {
             (tail_x - 1, tail_y)
         } else {
             (tail_x + 1, tail_y)
