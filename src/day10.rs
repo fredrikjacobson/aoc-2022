@@ -2,7 +2,7 @@ use std::{collections::HashSet, hash::Hash, str::FromStr};
 
 use crate::helper::{read_lines, ParseError};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Instruction {
     Add { x: i32 },
     NoOp,
@@ -69,7 +69,8 @@ impl Iterator for CPU {
 
 #[test]
 pub fn test_day10_pt_1() {
-    let mut cpu = parse_CPU(false);
+    let lines: Vec<String> = read_lines(10, false);
+    let mut cpu = parse_CPU(lines);
 
     let mut signals: Vec<(i32, i32)> = Vec::new();
     signals.push((20, cpu.nth(19).unwrap()));
@@ -85,9 +86,28 @@ pub fn test_day10_pt_1() {
     println!("Part1 score is {:?} with sum {}", signals, sum);
     assert!(false);
 }
+
+#[test]
+pub fn test_parse_instruction() {
+    let input = r#"noop
+	addx 3
+	addx -5"#;
+    let lines = input.split("\n").map(|l| l.to_owned()).collect();
+
+    let expected = vec![
+        Instruction::NoOp,
+        Instruction::Add { x: 3 },
+        Instruction::Add { x: -5 },
+    ];
+
+    let result = parse_CPU(lines);
+    assert_eq!(expected, result.instructions);
+}
+
 #[test]
 pub fn test_day10_pt_2() {
-    let mut cpu = parse_CPU(false);
+    let lines: Vec<String> = read_lines(10, false);
+    let mut cpu = parse_CPU(lines);
 
     let mut crt = vec![vec![' '; 40]; 6];
     for row in 0..6 {
@@ -107,8 +127,7 @@ pub fn test_day10_pt_2() {
     assert!(false);
 }
 
-fn parse_CPU(test: bool) -> CPU {
-    let lines: Vec<String> = read_lines(10, test);
+fn parse_CPU(lines: Vec<String>) -> CPU {
     let instructions = lines
         .iter()
         .map(|i| {
