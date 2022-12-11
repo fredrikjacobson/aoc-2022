@@ -1,4 +1,8 @@
-use std::{collections::HashSet, hash::Hash, str::FromStr};
+use std::{collections::HashSet, error::Error, hash::Hash, str::FromStr};
+
+use nom::{
+    branch::alt, bytes::complete::tag, character::complete, sequence::preceded, IResult, Parser,
+};
 
 use crate::helper::{read_lines, ParseError};
 
@@ -70,7 +74,7 @@ impl Iterator for CPU {
 #[test]
 pub fn test_day10_pt_1() {
     let lines: Vec<String> = read_lines(10, false);
-    let mut cpu = parse_CPU(lines);
+    let (_, mut cpu) = parse_CPU(lines).unwrap();
 
     let mut signals: Vec<(i32, i32)> = Vec::new();
     signals.push((20, cpu.nth(19).unwrap()));
@@ -100,14 +104,14 @@ pub fn test_parse_instruction() {
         Instruction::Add { x: -5 },
     ];
 
-    let result = parse_CPU(lines);
+    let (_, result) = parse_CPU(lines).unwrap();
     assert_eq!(expected, result.instructions);
 }
 
 #[test]
 pub fn test_day10_pt_2() {
     let lines: Vec<String> = read_lines(10, false);
-    let mut cpu = parse_CPU(lines);
+    let (_, mut cpu) = parse_CPU(lines).unwrap();
 
     let mut crt = vec![vec![' '; 40]; 6];
     for row in 0..6 {
@@ -127,20 +131,18 @@ pub fn test_day10_pt_2() {
     assert!(false);
 }
 
-fn parse_CPU(lines: Vec<String>) -> CPU {
+fn parse_CPU(lines: Vec<String>) -> IResult<String, CPU> {
     let instructions = lines
-        .iter()
-        .map(|i| {
-            if i.starts_with("noop") {
-                Instruction::NoOp
-            } else {
-                let (_, number) = i.split_once(" ").unwrap();
-                Instruction::Add {
-                    x: number.parse::<i32>().unwrap(),
-                }
-            }
-        })
+        .into_iter()
+        .map(|l| parse_instruction(l.as_str()).unwrap().1)
         .collect();
     let mut cpu = CPU::new(instructions);
-    cpu
+    Ok(("".to_owned(), cpu))
+}
+
+fn parse_instruction(input: &str) -> IResult<&str, Instruction> {
+    alt((
+        tag("noop").map(|_| Instruction::NoOp),
+        preceded(tag("addx"), complete::i32).map(|num| Instruction::Add { x: num }),
+    ))(input)
 }

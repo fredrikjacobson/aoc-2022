@@ -1,5 +1,5 @@
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{BufRead, BufReader},
 };
 
@@ -12,6 +12,14 @@ pub fn read_lines(day: i32, test: bool) -> Vec<String> {
     .unwrap();
     let reader = BufReader::new(file);
     reader.lines().filter_map(std::io::Result::ok).collect()
+}
+pub fn read_string(day: i32, test: bool) -> String {
+    let path = format!(
+        "resources/day{}{}.txt",
+        day,
+        if test { "_test" } else { "" }
+    );
+    fs::read_to_string(path).unwrap()
 }
 
 #[derive(Debug)]
