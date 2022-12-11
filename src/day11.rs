@@ -13,6 +13,7 @@ use nom::{
     sequence::{delimited, pair, preceded, tuple},
     IResult, Parser,
 };
+use num::{self, integer};
 
 use crate::helper::{read_lines, read_string, ParseError};
 
@@ -38,12 +39,12 @@ pub fn test_parse_monkey() {
 }
 #[derive(PartialEq, Debug)]
 struct Monkey {
-    starting_items: Vec<u32>,
+    starting_items: Vec<u64>,
     operation: Operation,
-    divisible_test: u32,
-    monkey_true: u32,
-    monkey_false: u32,
-    inspected: u32,
+    divisible_test: u64,
+    monkey_true: u64,
+    monkey_false: u64,
+    inspected: u64,
 }
 fn parse_monkey(input: &str) -> IResult<&str, Monkey> {
     let (input, (starting_items, operation, divisible_test, monkey_true, monkey_false)) =
@@ -52,13 +53,13 @@ fn parse_monkey(input: &str) -> IResult<&str, Monkey> {
             tuple((
                 delimited(
                     tag("  Starting items: "),
-                    separated_list1(tag(", "), map_res(digit1, |s: &str| s.parse::<u32>())),
+                    separated_list1(tag(", "), map_res(digit1, |s: &str| s.parse::<u64>())),
                     newline,
                 ),
                 delimited(tag("  Operation: new = "), parse_operation, newline),
-                delimited(tag("  Test: divisible by "), complete::u32, newline),
-                delimited(tag("    If true: throw to monkey "), complete::u32, newline),
-                preceded(tag("    If false: throw to monkey "), complete::u32),
+                delimited(tag("  Test: divisible by "), complete::u64, newline),
+                delimited(tag("    If true: throw to monkey "), complete::u64, newline),
+                preceded(tag("    If false: throw to monkey "), complete::u64),
             )),
         )(input)?;
 
@@ -134,9 +135,9 @@ pub fn test_day11_pt_1() {
     let size = monkeys.len();
     for _ in 0..20 {
         for i in 0..size {
-            let throws = monkey_inspect(&monkeys[i]);
+            let throws = monkey_inspect(&monkeys[i], &|num| num / 3);
             monkeys[i].starting_items = Vec::new();
-            monkeys[i].inspected = monkeys[i].inspected + throws.len() as u32;
+            monkeys[i].inspected = monkeys[i].inspected + throws.len() as u64;
 
             for (destination, item) in throws {
                 monkeys[destination as usize].starting_items.push(item);
@@ -144,17 +145,18 @@ pub fn test_day11_pt_1() {
         }
     }
 
-    let mut inspected = monkeys.iter().map(|m| m.inspected).collect::<Vec<u32>>();
+    let mut inspected = monkeys.iter().map(|m| m.inspected).collect::<Vec<u64>>();
     inspected.sort_by(|a, b| b.cmp(a));
     let monkey_business = inspected[0] * inspected[1];
     println!("Part1 score is {:?}", monkey_business);
-    assert!(false);
+    assert_eq!(monkey_business, 51075);
 }
 
-fn monkey_inspect(monkey: &Monkey) -> Vec<(u32, u32)> {
+type WorryManager = dyn Fn(u64) -> u64;
+fn monkey_inspect(monkey: &Monkey, worry_manager: &WorryManager) -> Vec<(u64, u64)> {
     let mut throws = Vec::new();
     for item in monkey.starting_items.iter() {
-        let new_worry = get_new_worry_level(*item, &monkey.operation);
+        let new_worry = get_new_worry_level(*item, &monkey.operation, worry_manager);
         if new_worry % monkey.divisible_test == 0 {
             throws.push((monkey.monkey_true, new_worry));
         } else {
@@ -164,20 +166,21 @@ fn monkey_inspect(monkey: &Monkey) -> Vec<(u32, u32)> {
     throws
 }
 
-fn get_new_worry_level(item: u32, operation: &Operation) -> u32 {
+fn get_new_worry_level(item: u64, operation: &Operation, worry_manager: &WorryManager) -> u64 {
     let new_worry = match operation.op {
         Arithmetic::Add => to_value(item, &operation.lhs) + to_value(item, &operation.rhs),
         Arithmetic::Subtract => to_value(item, &operation.lhs) - to_value(item, &operation.rhs),
         Arithmetic::Multiply => to_value(item, &operation.lhs) * to_value(item, &operation.rhs),
         Arithmetic::Divide => to_value(item, &operation.lhs) / to_value(item, &operation.rhs),
     };
-    new_worry
+
+    worry_manager(new_worry)
 }
 
-fn to_value(current: u32, value: &Value) -> u32 {
+fn to_value(current: u64, value: &Value) -> u64 {
     match value {
         Value::Old => current,
-        Value::Value { x } => *x as u32,
+        Value::Value { x } => *x as u64,
     }
 }
 
@@ -186,22 +189,40 @@ pub fn test_day11_pt_2() {
     let input: String = read_string(11, false);
     let (_, mut monkeys) = parse_monkeys(&input).unwrap();
 
+    let lcm = manage_worry(&monkeys.iter().map(|m| m.divisible_test).collect()) as u64;
+
+    let worry_manager_factory = |modulus: u64| move |num: u64| num % modulus;
+
+    println!("Worries LCM: {}", lcm);
+
     let size = monkeys.len();
     for _ in 0..10000 {
         for i in 0..size {
-            let throws = monkey_inspect(&monkeys[i]);
+            let throws = monkey_inspect(&monkeys[i], &worry_manager_factory(lcm));
             monkeys[i].starting_items = Vec::new();
-            monkeys[i].inspected = monkeys[i].inspected + throws.len() as u32;
+            monkeys[i].inspected = monkeys[i].inspected + throws.len() as u64;
 
             for (destination, item) in throws {
                 monkeys[destination as usize].starting_items.push(item);
             }
         }
     }
+    for (i, monkey) in monkeys.iter().enumerate() {
+        println!("Monkey {}: {:?}", i + 1, monkey);
+    }
 
-    let mut inspected = monkeys.iter().map(|m| m.inspected).collect::<Vec<u32>>();
+    let mut inspected = monkeys.iter().map(|m| m.inspected).collect::<Vec<u64>>();
     inspected.sort_by(|a, b| b.cmp(a));
     let monkey_business = inspected[0] as u64 * inspected[1] as u64;
     println!("Part2 score is {:?}", monkey_business);
     assert!(false);
+}
+
+fn manage_worry(worries: &Vec<u64>) -> u128 {
+    let res = worries
+        .iter()
+        .map(|num| *num as u128)
+        .reduce(|start: u128, elem| integer::lcm(start.into(), elem.into()))
+        .unwrap();
+    res
 }
