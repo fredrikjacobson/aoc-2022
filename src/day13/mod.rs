@@ -1,120 +1,15 @@
-use std::{cmp::Ordering, collections::HashSet, hash::Hash, str::FromStr};
+use packet::PacketData::*;
 
-use nom::{
-    branch::alt,
-    bytes::complete::{tag, take_while},
-    character::complete::{self, digit1, newline, one_of},
-    combinator::map_res,
-    multi::{separated_list0, separated_list1},
-    sequence::{delimited, pair, preceded, tuple},
-    IResult, Parser,
-};
+use packet::{Packet, PacketData};
 
-use crate::helper::{read_lines, ParseError};
+use crate::helper::read_lines;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum PacketData {
-    Integer { value: usize },
-    List { values: Vec<PacketData> },
-}
-use PacketData::*;
-#[derive(Debug, Clone)]
-struct Packet {
-    left: Vec<PacketData>,
-    right: Vec<PacketData>,
-}
-
-impl Ord for PacketData {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match compare(&vec![self.clone()], &vec![other.clone()]) {
-            Some(false) => Ordering::Greater,
-            Some(true) => Ordering::Less,
-            None => Ordering::Equal,
-        }
-    }
-}
-
-impl PartialOrd for PacketData {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-fn parse_list(input: &str) -> Vec<PacketData> {
-    let mut stack = Vec::new();
-    let mut current: Vec<PacketData> = Vec::new();
-
-    let mut num = "".to_owned();
-    for c in input.chars() {
-        if c == '[' {
-            stack.push(current);
-            current = Vec::new();
-        } else if c.is_numeric() {
-            num = num + &c.to_string();
-        } else if c == ',' {
-            if !num.is_empty() {
-                current.push(Integer {
-                    value: num.parse::<usize>().unwrap(),
-                });
-                num = "".to_owned();
-            }
-        } else if c == ']' {
-            if !num.is_empty() {
-                current.push(Integer {
-                    value: num.parse::<usize>().unwrap(),
-                });
-                num = "".to_owned();
-            }
-            if let Some(mut tail) = stack.pop() {
-                tail.push(List { values: current });
-                current = tail;
-            }
-        }
-    }
-
-    if let List { values } = &current[0] {
-        values.clone()
-    } else {
-        panic!("Top should be list")
-    }
-}
-
-fn parse_pairs(input: &Vec<String>) -> Vec<Packet> {
-    let mut packets: Vec<Packet> = Vec::new();
-    for group in input.chunks(3) {
-        if let [first, second, _] = group {
-            packets.push(Packet {
-                left: parse_list(first),
-                right: parse_list(second),
-            });
-        } else if let [first, second] = group {
-            packets.push(Packet {
-                left: parse_list(first),
-                right: parse_list(second),
-            });
-        }
-    }
-
-    packets
-}
-
-#[test]
-pub fn test_list() {
-    let line = "[9,3,3,10,7]";
-    let data = parse_list(line);
-    println!("Data: {:?}", data);
-
-    let line = "[[1],[2,3,4]]";
-
-    let data = parse_list(line);
-    println!("Data: {:?}", data);
-    assert!(data.len() == 2);
-}
+mod packet;
 
 #[test]
 pub fn test_day13_pt_1() {
     let lines: Vec<String> = read_lines(13, false);
-    let pairs = parse_pairs(&lines);
+    let pairs = packet::parse_pairs(&lines);
 
     let mut sum = 0;
     for (i, pair) in pairs.iter().enumerate() {
@@ -168,7 +63,7 @@ fn print_data(data: &PacketData) -> String {
     data_str
 }
 
-fn compare(left: &Vec<PacketData>, right: &Vec<PacketData>) -> Option<bool> {
+pub fn compare(left: &Vec<PacketData>, right: &Vec<PacketData>) -> Option<bool> {
     // println!("Compare {:?} vs {:?}", left, right);
     for i in 0..left.len().max(right.len()) {
         match (left.get(i), right.get(i)) {
@@ -239,7 +134,7 @@ fn compare(left: &Vec<PacketData>, right: &Vec<PacketData>) -> Option<bool> {
 #[test]
 pub fn test_day13_pt_2() {
     let lines: Vec<String> = read_lines(13, false);
-    let mut pairs: Vec<PacketData> = parse_pairs(&lines)
+    let mut pairs: Vec<PacketData> = packet::parse_pairs(&lines)
         .iter()
         .flat_map(|pair| {
             vec![
