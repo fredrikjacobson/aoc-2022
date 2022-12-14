@@ -2,27 +2,27 @@ use packet::PacketData::*;
 
 use packet::{Packet, PacketData};
 
-use crate::helper::read_lines;
+use crate::helper::read_string;
 
 mod packet;
 
 #[test]
 pub fn test_day13_pt_1() {
-    let lines: Vec<String> = read_lines(13, false);
-    let pairs = packet::parse_pairs(&lines);
+    let input: String = read_string(13, false);
+    let pairs = packet::parse_packets(&input);
 
     let mut sum = 0;
     for (i, pair) in pairs.iter().enumerate() {
         let is_right_order = compare(&pair.left, &pair.right);
         if let Some(true) = is_right_order {
-            print_pair(pair);
+            // print_pair(pair);
             sum = sum + i + 1;
         }
         // println!("Pair {}  - {:?}", i + 1, is_right_order)
     }
     println!("{}", pairs.len());
     println!("Part1 score is {:?}", sum);
-    assert!(false);
+    assert_eq!(sum, 5682);
 }
 
 fn print_pair(pair: &Packet) {
@@ -133,35 +133,38 @@ pub fn compare(left: &Vec<PacketData>, right: &Vec<PacketData>) -> Option<bool> 
 
 #[test]
 pub fn test_day13_pt_2() {
-    let lines: Vec<String> = read_lines(13, false);
-    let mut pairs: Vec<PacketData> = packet::parse_pairs(&lines)
-        .iter()
-        .flat_map(|pair| {
-            vec![
-                List {
-                    values: pair.left.clone(),
-                },
-                List {
-                    values: pair.right.clone(),
-                },
-            ]
-        })
-        .collect();
+    let input: String = read_string(13, false);
+    let mut pairs: Vec<PacketData> = flatten_packets(input);
+    let decoder_packets = [
+        List {
+            values: vec![List {
+                values: vec![Integer { value: 2 }],
+            }],
+        },
+        List {
+            values: vec![List {
+                values: vec![Integer { value: 6 }],
+            }],
+        },
+    ];
 
-    pairs.push(List {
-        values: vec![List {
-            values: vec![Integer { value: 2 }],
-        }],
-    });
-    pairs.push(List {
-        values: vec![List {
-            values: vec![Integer { value: 6 }],
-        }],
-    });
+    pairs.push(decoder_packets[0].clone());
+    pairs.push(decoder_packets[1].clone());
 
     pairs.sort();
 
-    let decoders: Vec<usize> = pairs
+    let decoders: Vec<usize> = find_decoder_packets(&pairs);
+    for pair in pairs {
+        println!("{}", &print_data(&pair));
+    }
+    println!("{:?}", &decoders);
+    let score = (decoders[0] + 1) * (decoders[1] + 1);
+    println!("Part2 score is {:?}", score);
+    assert_eq!(score, 20304);
+}
+
+fn find_decoder_packets(pairs: &Vec<PacketData>) -> Vec<usize> {
+    pairs
         .iter()
         .enumerate()
         .filter_map(|(i, p)| match p {
@@ -175,11 +178,21 @@ pub fn test_day13_pt_2() {
             },
             _ => None,
         })
-        .collect();
-    for pair in pairs {
-        println!("{}", &print_data(&pair));
-    }
-    println!("{:?}", &decoders);
-    println!("Part2 score is {:?}", (decoders[0] + 1) * (decoders[1] + 1));
-    assert!(false);
+        .collect()
+}
+
+fn flatten_packets(input: String) -> Vec<PacketData> {
+    packet::parse_packets(&input)
+        .iter()
+        .flat_map(|pair| {
+            vec![
+                List {
+                    values: pair.left.clone(),
+                },
+                List {
+                    values: pair.right.clone(),
+                },
+            ]
+        })
+        .collect()
 }
