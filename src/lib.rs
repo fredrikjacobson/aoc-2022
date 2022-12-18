@@ -4,6 +4,7 @@ mod day11;
 pub mod day12;
 mod day13;
 mod day14;
+pub mod day15;
 mod day2;
 mod day3;
 mod day4;
