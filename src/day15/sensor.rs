@@ -32,19 +32,45 @@ impl Position {
         false
     }
 }
+
 #[derive(Debug, Clone)]
 pub struct Sensor {
     pub position: Position,
     pub closest_beacon: Position,
+    pub manhattan_distance: i32,
+    pub x_range: (i32, i32),
+    pub y_range: (i32, i32),
+    pub lines: [(i32, i32); 4],
 }
 
 impl Sensor {
+    pub fn new(position: Position, closest_beacon: Position) -> Sensor {
+        let manhattan_distance = manhattan_distance(&position, &closest_beacon);
+        let x_range = (
+            position.x - manhattan_distance,
+            position.x + manhattan_distance,
+        );
+        let y_range = (
+            position.y - manhattan_distance,
+            position.y + manhattan_distance,
+        );
+
+        Sensor {
+            position,
+            closest_beacon: closest_beacon,
+            manhattan_distance,
+            x_range,
+            y_range,
+            lines: get_lines(manhattan_distance, &position),
+        }
+    }
+
     pub fn search_grid(
         &self,
         lower: Position,
         upper: Position,
     ) -> impl Iterator<Item = (i32, Range<i32>)> + '_ {
-        let distance = self.manhattan_distance();
+        let distance = self.manhattan_distance;
         let row = self.position.y - distance;
         let mut count = -1 + (lower.y - row).max(0);
         let top_iterator = std::iter::from_fn(move || {
@@ -79,21 +105,12 @@ impl Sensor {
         top_iterator.chain(bottom_iterator)
     }
 
-    pub fn manhattan_distance(&self) -> i32 {
-        (self.position.x.abs_diff(self.closest_beacon.x)
-            + self.position.y.abs_diff(self.closest_beacon.y)) as i32
-    }
-
     pub fn within_bounds(&self, lower: &Position, upper: &Position) -> bool {
-        let distance = self.manhattan_distance();
-        let x_range = (self.position.x - distance, self.position.x + distance);
-        let y_range = (self.position.y - distance, self.position.y + distance);
-
-        if (x_range.0 <= lower.x && x_range.1 >= lower.x)
-            || (x_range.0 >= lower.x && x_range.0 <= upper.x)
+        if (self.x_range.0 <= lower.x && self.x_range.1 >= lower.x)
+            || (self.x_range.0 >= lower.x && self.x_range.0 <= upper.x)
         {
-            if (y_range.0 <= lower.y && y_range.1 >= lower.y)
-                || (y_range.0 >= lower.y && y_range.0 <= upper.y)
+            if (self.y_range.0 <= lower.y && self.y_range.1 >= lower.y)
+                || (self.y_range.0 >= lower.y && self.y_range.0 <= upper.y)
             {
                 return true;
             }
@@ -101,24 +118,10 @@ impl Sensor {
         return false;
     }
 
-    fn lines(&self) -> [(i32, i32); 4] {
-        let mut slopes = [(0, 0); 4];
-        let distance = self.manhattan_distance();
-        let k = -1;
-        let m = self.position.y - (distance + 1) - k * self.position.x;
-        slopes[0] = (k, m);
-        slopes[1] = (k, m + (distance + 1) * 2);
-        let k = 1;
-        let m = (self.position.y + (distance + 1)) - k * self.position.x;
-        slopes[2] = (k, m);
-        slopes[3] = (k, m - (distance + 1) * 2);
-        slopes
-    }
-
     pub fn intersects(&self, other: &Sensor) -> bool {
         if self.position != other.position {
-            let this_slope = self.lines();
-            let other_slope = other.lines();
+            let this_slope = self.lines;
+            let other_slope = other.lines;
             if !HashSet::from(this_slope)
                 .intersection(&HashSet::from(other_slope))
                 .collect::<Vec<&(i32, i32)>>()
@@ -131,7 +134,7 @@ impl Sensor {
     }
 
     pub fn line_points(&self) -> impl Iterator<Item = Position> + '_ {
-        let distance = self.manhattan_distance();
+        let distance = self.manhattan_distance;
         let mut x = self.position.x - distance - 1;
         let mut y = self.position.y;
         let mut side = Side::None;
@@ -170,7 +173,7 @@ impl Sensor {
     }
 
     pub fn contains(&self, pos: &Position) -> bool {
-        let lines = self.lines();
+        let lines = self.lines;
         if lines[0].0 * pos.x + lines[0].1 < pos.y
             && lines[1].0 * pos.x + lines[1].1 > pos.y
             && lines[2].0 * pos.x + lines[2].1 > pos.y
@@ -192,22 +195,34 @@ enum Side {
     Done,
 }
 
+fn manhattan_distance(position: &Position, beacon: &Position) -> i32 {
+    (position.x.abs_diff(beacon.x) + position.y.abs_diff(beacon.y)) as i32
+}
+
 #[test]
 pub fn test_slope() {
-    let sensor_1 = Sensor {
-        position: Position { x: 5, y: 5 },
-        closest_beacon: Position { x: 5, y: 1 },
-    };
+    let sensor_1 = Sensor::new(Position { x: 5, y: 5 }, Position { x: 5, y: 1 });
 
-    println!("{:?}", sensor_1.lines());
+    println!("{:?}", sensor_1.lines);
+}
+
+fn get_lines(manhattan_distance: i32, position: &Position) -> [(i32, i32); 4] {
+    let mut slopes = [(0, 0); 4];
+    let distance = manhattan_distance;
+    let k = -1;
+    let m = position.y - (distance + 1) - k * position.x;
+    slopes[0] = (k, m);
+    slopes[1] = (k, m + (distance + 1) * 2);
+    let k = 1;
+    let m = (position.y + (distance + 1)) - k * position.x;
+    slopes[2] = (k, m);
+    slopes[3] = (k, m - (distance + 1) * 2);
+    slopes
 }
 
 #[test]
 pub fn test_search_grid() {
-    let sensor = Sensor {
-        position: Position { x: 8, y: 7 },
-        closest_beacon: Position { x: 2, y: 10 },
-    };
+    let sensor = Sensor::new(Position { x: 8, y: 7 }, Position { x: 2, y: 10 });
 
     let mut count = 0;
     let mut grid = vec![vec![false; 20]; 20];
@@ -226,10 +241,7 @@ pub fn test_search_grid() {
 
 #[test]
 pub fn test_search_grid2() {
-    let sensor = Sensor {
-        position: Position { x: 20, y: 14 },
-        closest_beacon: Position { x: 25, y: 17 },
-    };
+    let sensor = Sensor::new(Position { x: 20, y: 14 }, Position { x: 25, y: 17 });
 
     let mut count = 0;
     let mut grid = vec![vec![true; 5]; 5];
@@ -265,15 +277,17 @@ pub fn parse_sensor(input: &str) -> IResult<&str, Sensor> {
             preceded(tag(": closest beacon is at x="), complete::i32),
             preceded(tag(", y="), complete::i32),
         )),
-        |(sensor_x, sensor_y, beacon_x, beacon_y)| Sensor {
-            position: Position {
-                x: sensor_x,
-                y: sensor_y,
-            },
-            closest_beacon: Position {
-                x: beacon_x,
-                y: beacon_y,
-            },
+        |(sensor_x, sensor_y, beacon_x, beacon_y)| {
+            Sensor::new(
+                Position {
+                    x: sensor_x,
+                    y: sensor_y,
+                },
+                Position {
+                    x: beacon_x,
+                    y: beacon_y,
+                },
+            )
         },
     )(input)
 }
